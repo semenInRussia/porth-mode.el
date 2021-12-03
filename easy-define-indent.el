@@ -81,7 +81,9 @@ All vars and functions will save in `NAMESPACE`.  `RULES` is list of
                  (indention/indent-line-with-sorted-rules (eval (from-namespace
                                                                  ,namespace
                                                                  indention-rules
-                                                                 )))
+                                                                 ))
+                                                          :clear-old-indention
+                                                          clear-old-indention)
                  )
 
 
