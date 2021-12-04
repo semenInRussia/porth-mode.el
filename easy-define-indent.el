@@ -69,6 +69,13 @@ All vars and functions will save in `NAMESPACE`.  `RULES` is list of
                  :group ',major-mode
                  :type '(repeat function))
 
+             (add-hook (from-namespace ,namespace each-line-before-indent)
+                       ',(cond
+                           (copy-indention-of-previous-line
+                            'indention/duplicate-indention-of-prev-line)
+                           (clear-old-indention
+                            'indention/clear-indention)))
+
              (defcustom-from-namespace ,namespace one-indent
                  ,one-indent
                  "One level of indention for ${major-mode-name}."
@@ -174,23 +181,19 @@ current line when check or indent current line."
 (defun indention/duplicate-indention-of-prev-line ()
     "Duplicate for current line indention of previous line."
     (interactive)
-    (indention/clear-indention)
-
-    (save-excursion
-        (forward-line -1)
-        (indention/to-backward-not-empty-line)
-        (indention/mark-indention)
-        (copy-region-as-kill (region-beginning) (region-end)))
-
-    (beginning-of-line)
-    (yank)
+    (let ((prev-line-pos (progn
+                             (indention/to-backward-not-empty-line)
+                             (end-of-line)
+                             (point)))))
+    (indent-region-line-by-line previ)
     )
 
 
 (defun indention/to-backward-not-empty-line ()
     "Navigate to backward line not empty (has 1+ not whitespace symbol)."
     (forward-line -1)
-    (search-backward-regexp "^.*\\S+.*$" nil nil)
+    (end-of-line)
+    (search-backward-regexp "[^ \n\t]" nil nil)
     )
 
 
