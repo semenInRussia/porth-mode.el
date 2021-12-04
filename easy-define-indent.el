@@ -1,4 +1,4 @@
-;;; easy-define-indent --- Mark create indent region function as easy task.
+;;; easy-define-indent --- Mark create indent region function as easy task.-*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2021 Free Software Foundation, Inc.
 
@@ -41,15 +41,13 @@
      &key
        rules
        (one-indent indention/default-one-indent)
-       (clear-old-indention t)
+       (copy-indention-of-previous-line t)
+       (clear-old-indention nil)
        )
     "Create all variables and functions for indent code in `MAJOR-MODE`.
 All vars and functions will save in `NAMESPACE`.  `RULES` is list of
  groups from rules which should create with `indention/make-rule`."
-    (let ((major-mode-name (symbol-name major-mode))
-          (indention-rules-template `(from-namespace
-                                      ,namespace indention-rules)))
-
+    (let ((major-mode-name (symbol-name major-mode)))
         `(progn
              (defcustom-from-namespace ,namespace indention-rules
                  (-map 'eval ,rules)
@@ -57,12 +55,25 @@ All vars and functions will save in `NAMESPACE`.  `RULES` is list of
                  :group ',major-mode
                  :type '(repeat (list function function integer)))
 
+             (defcustom-from-namespace ,namespace each-line-after-indent-hook
+                 nil
+                 ,(s-lex-format
+                   "Hooks which run after each indent line.")
+                 :group ',major-mode
+                 :type '(repeat function))
+
+             (defcustom-from-namespace ,namespace each-line-before-indent-hook
+                 nil
+                 ,(s-lex-format
+                   "Hooks which run before each indent line.")
+                 :group ',major-mode
+                 :type '(repeat function))
+
              (defcustom-from-namespace ,namespace one-indent
                  ,one-indent
                  "One level of indention for ${major-mode-name}."
                  :group ',major-mode
                  :type 'string)
-
 
              (defun-in-namespace
                  ,namespace add-indent-to-current-line ()
@@ -78,14 +89,13 @@ All vars and functions will save in `NAMESPACE`.  `RULES` is list of
                    "Indent line with `LINE-NUM` for ${major-mode-name}.")
                  (interactive (list (line-number-at-pos (point))))
                  (goto-line line-num)
-                 (indention/indent-line-with-sorted-rules (eval (from-namespace
-                                                                 ,namespace
-                                                                 indention-rules
-                                                                 ))
-                                                          :clear-old-indention
-                                                          clear-old-indention)
+                 (indention/indent-line-with-sorted-rules
+                  (eval (from-namespace ,namespace indention-rules))
+                  :each-line-before-indent-hook
+                  (from-namespace ,namespace each-line-before-indent-hook)
+                  :each-line-after-indent-hook
+                  (from-namespace ,namespace each-line-after-indent-hook))
                  )
-
 
              (defun-in-namespace
                  ,namespace indent-lines (beg end)
@@ -124,13 +134,20 @@ non-nil value.  If some rules' `INDENT-LINE-P` return non-nil value, then call
     (list indent-current-line indent-line-p))
 
 
-(defun indention/indent-line-with-sorted-rules (sorted-rules)
-    "Indent or don't indent current line depending on `SORTED-RULES`."
+(cl-defun indention/indent-line-with-sorted-rules
+    (sorted-rules &key
+                    (each-line-before-indent-hook nil)
+                    (each-line-after-indent-hook nil))
+    "Indent or don't indent current line depending on `SORTED-RULES`.
+If `COPY-INDENTION-OF-PREV-LINE` is true, then for each line copy indent of
+previous line.  If `CLEAR-OLD-INDENTION` is true, then delete indention of
+current line when check or indent current line."
+    (run-hooks each-line-before-indent-hook)
     (cl-loop for rule in sorted-rules do
-         (message "rule is (%s)" rule)
-         (message "indent?   %s" (indention/rule-indent-current-line-p rule))
          (when (indention/rule-indent-current-line-p rule)
-             (indention/rule-call-indent-function rule)))
+             (indention/rule-call-indent-function rule
+                                                  )))
+    (run-hooks each-line-after-indent-hook)
     )
 
 
@@ -154,8 +171,45 @@ non-nil value.  If some rules' `INDENT-LINE-P` return non-nil value, then call
     )
 
 
+(defun indention/duplicate-indention-of-prev-line ()
+    "Duplicate for current line indention of previous line."
+    (interactive)
+    (indention/clear-indention)
+
+    (save-excursion
+        (forward-line -1)
+        (indention/to-backward-not-empty-line)
+        (indention/mark-indention)
+        (copy-region-as-kill (region-beginning) (region-end)))
+
+    (beginning-of-line)
+    (yank)
+    )
+
+
+(defun indention/to-backward-not-empty-line ()
+    "Navigate to backward line not empty (has 1+ not whitespace symbol)."
+    (forward-line -1)
+    (search-backward-regexp "^.*\\S+.*$" nil nil)
+    )
+
+
+(defun indention/empty-current-line-p ()
+    "Is current line empty (\"   \", \" \", \"\")?."
+    (s-blank-p (s-trim (thing-at-point 'line t)))
+    )
+
+
 (defun indention/clear-indention ()
-    "Clear indention of current line."
+    "Clear region indention of current line."
+    (interactive)
+    (indention/mark-indention)
+    (kill-region (region-beginning) (region-end))
+    )
+
+
+(defun indention/mark-indention ()
+    "Mark as selected region indention of current line."
     (interactive)
     (let* ((point-at-next-line (save-excursion (if (eq (forward-line) 1)
                                                    (end-of-line)
@@ -171,7 +225,9 @@ non-nil value.  If some rules' `INDENT-LINE-P` return non-nil value, then call
                                          point-at-next-line
                                          (1+ (point-at-bol)))
                                         (point))))
-        (kill-region (point-at-bol) (1- point-at-not-space-char)))
+        (goto-char (point-at-bol))
+        (set-mark (point))
+        (goto-char (1- point-at-not-space-char)))
     )
 
 
