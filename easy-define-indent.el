@@ -181,19 +181,18 @@ current line when check or indent current line."
 (defun indention/duplicate-indention-of-prev-line ()
     "Duplicate for current line indention of previous line."
     (interactive)
-    (let ((prev-line-pos (progn
-                             (indention/to-backward-not-empty-line)
-                             (end-of-line)
-                             (point)))))
-    (indent-region-line-by-line previ)
+    (indention/clear-indention)
+    (indent-relative)
     )
 
 
 (defun indention/to-backward-not-empty-line ()
     "Navigate to backward line not empty (has 1+ not whitespace symbol)."
+    (interactive)
     (forward-line -1)
     (end-of-line)
     (search-backward-regexp "[^ \n\t]" nil nil)
+    (end-of-line)
     )
 
 
