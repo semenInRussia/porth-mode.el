@@ -27,7 +27,8 @@
 (require 's)
 (require 'dash)
 
-(defgroup indention nil
+(defgroup indention
+    nil
     "Package for easy define indention functions and vars.")
 
 
@@ -43,38 +44,49 @@
        (one-indent indention/default-one-indent)
        (copy-indention-of-previous-line t)
        (clear-old-indention nil)
+       (clear-empty-lines t)
        )
     "Create all variables and functions for indent code in `MAJOR-MODE`.
 All vars and functions will save in `NAMESPACE`.  `RULES` is list of
- groups from rules which should create with `indention/make-rule`."
-    (let ((major-mode-name (symbol-name major-mode)))
+rules which you can create with `indention/make-rule`."
+    (let ((major-mode-name (symbol-name major-mode))
+          (before-each-line-hook (from-namespace-for-symbols
+                                  namespace
+                                  'each-line-before-indent-hook)))
         `(progn
              (defcustom-from-namespace ,namespace indention-rules
-                 (-map 'eval ,rules)
+                 nil
                  ,(s-lex-format "Rules of indention for ${major-mode-name}.")
                  :group ',major-mode
-                 :type '(repeat (list function function integer)))
+                 :type '(repeat (list function function)))
+
+             (set (from-namespace ,namespace indention-rules)
+                   ,rules)
 
              (defcustom-from-namespace ,namespace each-line-after-indent-hook
                  nil
-                 ,(s-lex-format
-                   "Hooks which run after each indent line.")
+                 ,(s-lex-format "Hooks which run after each indent line.")
                  :group ',major-mode
                  :type '(repeat function))
 
              (defcustom-from-namespace ,namespace each-line-before-indent-hook
                  nil
-                 ,(s-lex-format
-                   "Hooks which run before each indent line.")
+                 ,(s-lex-format "Hooks which run before each indent line.")
                  :group ',major-mode
                  :type '(repeat function))
 
-             (add-hook (from-namespace ,namespace each-line-before-indent)
-                       ',(cond
-                           (copy-indention-of-previous-line
-                            'indention/duplicate-indention-of-prev-line)
-                           (clear-old-indention
-                            'indention/clear-indention)))
+             ,(if copy-indention-of-previous-line
+                  `(add-hook ',before-each-line-hook
+                             'indention/duplicate-indention-of-prev-line)
+                  )
+
+             ,(if clear-old-indention
+                  `(add-hook ',before-each-line-hook 'indention/clear-indention)
+                  )
+
+             ,(if clear-empty-lines
+                  `(add-hook ',before-each-line-hook 'indention/if-empty-clear)
+                  )
 
              (defcustom-from-namespace ,namespace one-indent
                  ,one-indent
@@ -120,7 +132,6 @@ All vars and functions will save in `NAMESPACE`.  `RULES` is list of
                      )
                  )
 
-
              (defun-in-namespace
                  ,namespace indent-region (beg end)
                  ,(s-lex-format
@@ -136,30 +147,28 @@ All vars and functions will save in `NAMESPACE`.  `RULES` is list of
 (defun indention/make-rule (indent-current-line indent-line-p)
     "Create indention rule.
 `INDENT-CURRENT-LINE` is function which call when `INDENT-LINE-P` returns
-non-nil value.  If some rules' `INDENT-LINE-P` return non-nil value, then call
-`INDENT-CURRENT-LINE` of rule with greatest `PRIORITY`."
+non-nil value."
     (list indent-current-line indent-line-p))
 
 
 (cl-defun indention/indent-line-with-sorted-rules
-    (sorted-rules &key
-                    (each-line-before-indent-hook nil)
-                    (each-line-after-indent-hook nil))
+    (sorted-rules
+     &key
+       (each-line-before-indent-hook nil)
+       (each-line-after-indent-hook nil))
     "Indent or don't indent current line depending on `SORTED-RULES`.
-If `COPY-INDENTION-OF-PREV-LINE` is true, then for each line copy indent of
-previous line.  If `CLEAR-OLD-INDENTION` is true, then delete indention of
-current line when check or indent current line."
+Before each indent of line call `EACH-LINE-BEFORE-INDENT-HOOK`, after
+`EACH-LINE-AFTER-INDENT-HOOK`"
     (run-hooks each-line-before-indent-hook)
     (cl-loop for rule in sorted-rules do
          (when (indention/rule-indent-current-line-p rule)
-             (indention/rule-call-indent-function rule
-                                                  )))
+             (indention/rule-call-indent-function rule)))
     (run-hooks each-line-after-indent-hook)
     )
 
 
 (defun indention/rule-indent-current-line-p (rule)
-    "Check: this `RULE` must indent current line."
+    "Check this `RULE` must indent current line."
     (save-excursion (funcall (-second-item rule)))
     )
 
@@ -172,17 +181,15 @@ current line when check or indent current line."
     )
 
 
-(defun indention/rule-priority (rule)
-    "Get priority of `RULE`."
-    (-third-item rule)
-    )
-
-
 (defun indention/duplicate-indention-of-prev-line ()
     "Duplicate for current line indention of previous line."
     (interactive)
     (indention/clear-indention)
-    (indent-relative)
+    (save-excursion
+        (indention/to-backward-not-empty-line)
+        (indention/mark-indention)
+        (copy-region-as-kill (region-beginning) (region-end)))
+    (yank)
     )
 
 
@@ -207,6 +214,14 @@ current line when check or indent current line."
     (interactive)
     (indention/mark-indention)
     (kill-region (region-beginning) (region-end))
+    )
+
+(defun indention/if-empty-clear ()
+    "If current line is empty, then clear line and navigate to next line."
+    (interactive)
+    (when (indention/empty-current-line-p)
+        (kill-region (point-at-bol) (point-at-eol))
+        (forward-line))
     )
 
 
