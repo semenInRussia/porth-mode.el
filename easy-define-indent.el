@@ -36,6 +36,16 @@
   "Default indention when define for major mode.")
 
 
+(defvar indention/increment-indent-level-function nil
+  "This is function, which raise indent level of current line.
+Please, don't touch, this is change automatically.")
+
+
+(defvar indention/decrement-indent-level-function nil
+  "This is function, which deindent current line.
+Please, don't touch, this is change automatically.")
+
+
 (cl-defmacro indention/define-for-major-mode
     (major-mode
      &optional namespace
@@ -49,19 +59,31 @@
     "Create all variables and functions for indent code in `MAJOR-MODE`.
 All vars and functions will save in `NAMESPACE`.  `RULES` is list of
 rules which you can create with `indention/make-rule`."
-    (let ((major-mode-name (symbol-name major-mode))
-          (before-each-line-hook (from-namespace-for-symbols
+    (let* ((major-mode-name (symbol-name major-mode))
+           (before-each-line-hook (from-namespace-for-symbols
+                                   namespace
+                                   'each-line-before-indent-hook))
+           (after-each-line-hook (from-namespace-for-symbols
                                   namespace
-                                  'each-line-before-indent-hook)))
+                                  'each-line-after-indent-hook))
+           (one-indent-of-mode (from-namespace-for-symbols
+                                namespace
+                                'one-indent))
+           (before-run-indent-func-hook (from-namespace-for-symbols
+                                         namespace
+                                         'before-run-indent-func-hook))
+           (after-run-indent-func-hook (from-namespace-for-symbols
+                                        namespace
+                                        'after-run-indent-func-hook)))
         `(progn
              (defcustom-from-namespace ,namespace indention-rules
                  nil
-                 ,(s-lex-format "Rules of indention for ${major-mode-name}.")
+                 ,(s-concat "Rules of indention for " major-mode-name ".")
                  :group ',major-mode
                  :type '(repeat (list function function)))
 
              (set (from-namespace ,namespace indention-rules)
-                   ,rules)
+                  ,rules)
 
              (defcustom-from-namespace ,namespace each-line-after-indent-hook
                  nil
@@ -71,49 +93,90 @@ rules which you can create with `indention/make-rule`."
 
              (defcustom-from-namespace ,namespace each-line-before-indent-hook
                  nil
-                 ,(s-lex-format "Hooks which run before each indent line.")
+                 "Hooks which run before each indent line."
                  :group ',major-mode
                  :type '(repeat function))
 
+             (defcustom-from-namespace ,namespace before-run-indent-func-hook
+                 nil
+                 "Hooks which run before runing indent func."
+                 :group ',major-mode
+                 :type '(repeat function))
+
+             (defcustom-from-namespace ,namespace after-run-indent-func-hook
+                 nil
+                 ,(s-lex-format "Hooks which run after runing indent func.")
+                 :group ',major-mode
+                 :type '(repeat function))
+
+             (add-hook ',before-run-indent-func-hook
+                       (lambda ()
+                           (setq indention/increment-indent-level-function
+                                 (from-namespace ,namespace
+                                                 increment-indent-level))
+                           (setq indention/decrement-indent-level-function
+                                 (from-namespace ,namespace
+                                                 decrement-indent-level))))
+
+             (add-hook 'after-run-indent-func-hook
+                       'indention/to-defaults-change-indent-function)
+
              ,(if copy-indention-of-previous-line
                   `(add-hook ',before-each-line-hook
-                             'indention/duplicate-indention-of-prev-line)
-                  )
+                             'indention/duplicate-indention-of-prev-line))
 
              ,(if clear-old-indention
-                  `(add-hook ',before-each-line-hook 'indention/clear-indention)
-                  )
+                  `(add-hook ',before-each-line-hook
+                             'indention/clear-indention))
 
              ,(if clear-empty-lines
-                  `(add-hook ',before-each-line-hook 'indention/if-empty-clear)
-                  )
+                  `(add-hook ',before-each-line-hook 'indention/if-empty-clear))
 
              (defcustom-from-namespace ,namespace one-indent
                  ,one-indent
-                 "One level of indention for ${major-mode-name}."
+                 ,(s-lex-format
+                   "One level of indention for ${major-mode-name}.")
                  :group ',major-mode
                  :type 'string)
 
              (defun-in-namespace
-                 ,namespace add-indent-to-current-line ()
+                 ,namespace increment-indent-level ()
                  "Raise indention for current line."
                  (interactive)
                  (beginning-of-line)
-                 (insert (eval ,(from-namespace-for-symbols namespace
-                                                            'one-indent))))
+                 (insert ,one-indent-of-mode))
+
+             (defun-in-namespace
+                 ,namespace decrement-indent-level ()
+                 "Deindent current line."
+                 (interactive)
+                 (when (s-prefix-p ,one-indent-of-mode
+                                   (thing-at-point 'line t))
+                     (beginning-of-line)
+                     (delete-forward-char (length ,one-indent-of-mode)))
+                 )
 
              (defun-in-namespace
                  ,namespace indent-line (line-num)
                  ,(s-lex-format
-                   "Indent line with `LINE-NUM` for ${major-mode-name}.")
+                   "Indent line with `LINE-NUM`, for `${major-mode-name}`.")
+                 (interactive (list (line-number-at-pos (point))))
+                 (run-hooks ',before-run-indent-func-hook)
+                 (funcall-from-namespace ,namespace
+                                         indent-line-without-run-cmd-hooks
+                                         line-num)
+                 (run-hooks ',after-run-indent-func-hook)
+                 )
+
+             (defun-in-namespace
+                 ,namespace indent-line-without-run-cmd-hooks (line-num)
+                 "Indent line with `LINE-NUM`, but don't run command hooks."
                  (interactive (list (line-number-at-pos (point))))
                  (goto-line line-num)
                  (indention/indent-line-with-sorted-rules
                   (eval (from-namespace ,namespace indention-rules))
-                  :each-line-before-indent-hook
-                  (from-namespace ,namespace each-line-before-indent-hook)
-                  :each-line-after-indent-hook
-                  (from-namespace ,namespace each-line-after-indent-hook))
+                  :each-line-before-indent-hook ',before-each-line-hook
+                  :each-line-after-indent-hook ',after-each-line-hook)
                  )
 
              (defun-in-namespace
@@ -124,9 +187,25 @@ rules which you can create with `indention/make-rule`."
                  (interactive (list
                                (line-number-at-pos (region-beginning))
                                (line-number-at-pos (region-end))))
+                 (run-hooks ',before-run-indent-func-hook)
+                 (funcall-from-namespace ,namespace
+                                         indent-lines-without-run-cmd-hooks
+                                         beg end)
+                 (run-hooks ',after-run-indent-func-hook))
+
+             (defun-in-namespace
+                 ,namespace indent-lines-without-run-cmd-hooks (beg end)
+                 "Indent lines without run cmd hooks from `BEG` to `END`.
+`BEG` and `END` are numbers of lines."
+                 (interactive (list
+                               (line-number-at-pos (region-beginning))
+                               (line-number-at-pos (region-end))))
                  (unless (= (- end beg) 0)
-                     (funcall-from-namespace ,namespace indent-line beg)
-                     (funcall-from-namespace ,namespace indent-lines
+                     (funcall-from-namespace ,namespace
+                                             indent-line-without-run-cmd-hooks
+                                             beg)
+                     (funcall-from-namespace ,namespace
+                                             indent-lines-without-run-cmd-hooks
                                              (1+ beg)
                                              end)
                      )
@@ -137,12 +216,28 @@ rules which you can create with `indention/make-rule`."
                  ,(s-lex-format
                    "Indent region from `BEG` to `END` for ${major-mode-name}")
                  (interactive "r")
+                 (run-hooks ',before-run-indent-func-hook)
+                 (funcall-from-namespace ,namespace
+                                         indent-region-without-run-cmd-hooks
+                                         beg end)
+                 (run-hooks ',after-run-indent-func-hook)
+                 )
+
+             (defun-in-namespace
+                 ,namespace indent-region-without-run-cmd-hooks (beg end)
+                 "Indent region from `BEG` to `END` without run cmd hooks."
+                 (interactive "r")
                  (funcall-from-namespace ,namespace indent-lines
                                          (line-number-at-pos beg)
                                          (line-number-at-pos end))
                  )
              )))
 
+(defun indention/to-defaults-change-indent-function ()
+    "Set to `nil` `indention/increment-indent-level-function' and decremnt."
+    (setq indention/increment-indent-level-function nil)
+    (setq indention/decrement-indent-level-function nil)
+    )
 
 (defun indention/make-rule (indent-current-line indent-line-p)
     "Create indention rule.
