@@ -259,11 +259,11 @@ rules which you can create with `indention/make-rule`."
     )
 
 
-(defun indention/make-rule (indent-current-line indent-line-p)
+(cl-defun indention/make-rule (&key indent-func predicate)
     "Create indention rule.
-`INDENT-CURRENT-LINE` is function which call when `INDENT-LINE-P` returns
+`INDENT-FUNC` is function which call when `PREDICATE` returns
 non-nil value."
-    (list indent-current-line indent-line-p))
+    (list indent-func predicate))
 
 
 (cl-defun indention/indent-line-with-sorted-rules
