@@ -118,7 +118,7 @@ rules which you can create with `indention/make-rule`."
                                  (from-namespace ,namespace
                                                  decrement-indent-level))))
 
-             (add-hook 'after-run-indent-func-hook
+             (add-hook ',after-run-indent-func-hook
                        'indention/to-defaults-change-indent-function)
 
              ,(if copy-indention-of-previous-line
@@ -233,11 +233,31 @@ rules which you can create with `indention/make-rule`."
                  )
              )))
 
+
 (defun indention/to-defaults-change-indent-function ()
     "Set to `nil` `indention/increment-indent-level-function' and decremnt."
     (setq indention/increment-indent-level-function nil)
     (setq indention/decrement-indent-level-function nil)
     )
+
+
+(defun indention/increment-indent-level (&optional n)
+    "Increment indent level on `N`.
+`N` defaults to 1."
+    (interactive)
+    (setq n (or n 1))
+    (dotimes (_ n) (funcall indention/increment-indent-level-function))
+    )
+
+
+(defun indention/decrement-indent-level (&optional n)
+    "Decrement indent level on `N` (deindent current line).
+`N` defaults to 1."
+    (interactive)
+    (setq n (or n 1))
+    (dotimes (_ n) (funcall indention/decrement-indent-level-function))
+    )
+
 
 (defun indention/make-rule (indent-current-line indent-line-p)
     "Create indention rule.
