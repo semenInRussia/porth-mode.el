@@ -55,6 +55,7 @@ Please, don't touch, this is change automatically.")
        (copy-indention-of-previous-line t)
        (clear-old-indention nil)
        (clear-empty-lines t)
+       (not-use-rules-for-first-line t)
        )
     "Create all variables and functions for indent code in `MAJOR-MODE`.
 All vars and functions will save in `NAMESPACE`.  `RULES` is list of
@@ -161,6 +162,7 @@ rules which you can create with `indention/make-rule`."
                  ,(s-lex-format
                    "Indent line with `LINE-NUM`, for `${major-mode-name}`.")
                  (interactive (list (line-number-at-pos (point))))
+                 (goto-line line-num)
                  (run-hooks ',before-run-indent-func-hook)
                  (funcall-from-namespace ,namespace
                                          indent-line-without-run-cmd-hooks
@@ -216,6 +218,10 @@ rules which you can create with `indention/make-rule`."
                  ,(s-lex-format
                    "Indent region from `BEG` to `END` for ${major-mode-name}")
                  (interactive "r")
+                 ,(if not-use-rules-for-first-line
+                      `(setq beg (progn (goto-char beg)
+                                        (forward-line)
+                                        (point))))
                  (run-hooks ',before-run-indent-func-hook)
                  (funcall-from-namespace ,namespace
                                          indent-region-without-run-cmd-hooks
@@ -286,12 +292,12 @@ Return amount of moved lines."
 
 
 (defun indention/compose (&rest funs)
-  "Return function composed of FUNS."
-  (lexical-let ((lex-funs funs))
-    (lambda (&rest args)
-      (reduce 'funcall (butlast lex-funs)
-              :from-end t
-              :initial-value (apply (car (last lex-funs)) args)))))
+    "Return function composed of FUNS."
+    (lexical-let ((lex-funs funs))
+        (lambda (&rest args)
+            (reduce 'funcall (butlast lex-funs)
+                    :from-end t
+                    :initial-value (apply (car (last lex-funs)) args)))))
 
 
 (cl-defun indention/indent-line-with-sorted-rules
