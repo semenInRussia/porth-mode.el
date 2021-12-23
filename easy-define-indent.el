@@ -259,11 +259,39 @@ rules which you can create with `indention/make-rule`."
     )
 
 
-(cl-defun indention/make-rule (&key indent-func predicate)
+(cl-defun indention/make-rule (&rest args
+                               &key
+                                 indent-func
+                                 predicate
+                                 &allow-other-keys)
     "Create indention rule.
 `INDENT-FUNC` is function which call when `PREDICATE` returns
-non-nil value."
+non-nil value.  Possible `ARGS`:
+* :check-on-prev-line
+Before run `PREDICATE`, move to previous line."
+    (when (plist-member args :check-on-prev-line)
+        (setq predicate (indention/compose
+                         '-last-item
+                         (-juxt 'indention/previous-line predicate))))
     (list indent-func predicate))
+
+
+(defun indention/previous-line (&optional n)
+    "Move on previous line N times.
+Return amount of moved lines."
+    (interactive)
+    (setq n (or n 1))
+    (forward-line (- n))
+    )
+
+
+(defun indention/compose (&rest funs)
+  "Return function composed of FUNS."
+  (lexical-let ((lex-funs funs))
+    (lambda (&rest args)
+      (reduce 'funcall (butlast lex-funs)
+              :from-end t
+              :initial-value (apply (car (last lex-funs)) args)))))
 
 
 (cl-defun indention/indent-line-with-sorted-rules
@@ -284,7 +312,8 @@ Before each indent of line call `EACH-LINE-BEFORE-INDENT-HOOK`, after
 
 (defun indention/rule-indent-current-line-p (rule)
     "Check this `RULE` must indent current line."
-    (save-excursion (funcall (-second-item rule)))
+    (save-excursion
+        (funcall (-second-item rule)))
     )
 
 
