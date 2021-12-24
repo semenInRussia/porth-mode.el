@@ -275,10 +275,14 @@ rules which you can create with `indention/make-rule`."
 non-nil value.  Possible `ARGS`:
 * :check-on-prev-line
 Before run `PREDICATE`, move to previous line.
-* :on-keywords"
+* :on-keywords <keywords>
+Call INDENT-FUNC When line has one of keywords.
+* :on-chars <chars>
+Call INDENT-FUNC When line has one of chars."
     (let ((check-on-prev-line (plist-member args :check-on-prev-line))
           (keywords (plist-get args :on-keywords))
-          (chars (plist-get args :on-chars)))
+          (chars (plist-get args :on-chars))
+          )
         (when keywords
             (setq predicate (indention/make-line-has-keywords-p keywords)))
         (when chars
