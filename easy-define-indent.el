@@ -274,12 +274,41 @@ rules which you can create with `indention/make-rule`."
 `INDENT-FUNC` is function which call when `PREDICATE` returns
 non-nil value.  Possible `ARGS`:
 * :check-on-prev-line
-Before run `PREDICATE`, move to previous line."
-    (when (plist-member args :check-on-prev-line)
-        (setq predicate (indention/compose
-                         '-last-item
-                         (-juxt 'indention/previous-line predicate))))
-    (list indent-func predicate))
+Before run `PREDICATE`, move to previous line.
+* :on-keywords"
+    (let ((check-on-prev-line (plist-member args :check-on-prev-line))
+          (keywords (plist-get args :on-keywords)))
+        (when keywords
+            (setq predicate (indention/make-line-has-keywords-p keywords)))
+        (when check-on-prev-line
+            (setq predicate (indention/compose-with-prev-line predicate)))
+        (list indent-func predicate)))
+
+
+(defun indention/make-line-has-keywords-p (keywords)
+    "Make func, which if line has one of KEYWORDS, return t."
+    (declare (pure t) (side-effect-free t))
+    (lambda () (indention/line-has-keywords-p keywords))
+    )
+
+
+(defun indention/current-line ()
+    "Get content of current string."
+    (thing-at-point 'line t))
+
+
+(defun indention/line-has-keywords-p (keywords)
+    "If S, has one of KEYWORDS, return t."
+    (->> (indention/current-line)
+         (s-split " ")
+         (-map 's-trim)
+         (-any (apply-partially '-contains-p keywords))))
+
+
+(defun indention/compose-with-prev-line (fun)
+    "Return func, which run `indention/previous-line' and FUN."
+    (->> (-juxt 'indention/previous-line fun)
+         (indention/compose '-last-item)))
 
 
 (defun indention/previous-line (&optional n)
