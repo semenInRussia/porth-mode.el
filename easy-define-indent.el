@@ -277,9 +277,12 @@ non-nil value.  Possible `ARGS`:
 Before run `PREDICATE`, move to previous line.
 * :on-keywords"
     (let ((check-on-prev-line (plist-member args :check-on-prev-line))
-          (keywords (plist-get args :on-keywords)))
+          (keywords (plist-get args :on-keywords))
+          (chars (plist-get args :on-chars)))
         (when keywords
             (setq predicate (indention/make-line-has-keywords-p keywords)))
+        (when chars
+            (setq predicate (indention/make-line-has-chars-p chars)))
         (when check-on-prev-line
             (setq predicate (indention/compose-with-prev-line predicate)))
         (list indent-func predicate)))
@@ -292,17 +295,31 @@ Before run `PREDICATE`, move to previous line.
     )
 
 
-(defun indention/current-line ()
-    "Get content of current string."
-    (thing-at-point 'line t))
-
-
 (defun indention/line-has-keywords-p (keywords)
     "If S, has one of KEYWORDS, return t."
     (->> (indention/current-line)
          (s-split " ")
          (-map 's-trim)
          (-any (apply-partially '-contains-p keywords))))
+
+
+(defun indention/make-line-has-chars-p (chars)
+    "Make func, which if line has one of CHARS, return t."
+    (declare (pure t) (side-effect-free t))
+    (lambda () (indention/line-has-chars-p chars))
+    )
+
+
+(defun indention/line-has-chars-p (chars)
+    "If S, has one of CHARS, return t."
+    (let ((line (indention/current-line)))
+        (--any (s-contains-p (char-to-string it) line)
+               (string-to-list chars))))
+
+
+(defun indention/current-line ()
+    "Get content of current string."
+    (thing-at-point 'line t))
 
 
 (defun indention/compose-with-prev-line (fun)

@@ -5,11 +5,11 @@
   (list
    (indention/make-rule
     :indent-func 'indention/increment-indent-level
-    :predicate (lambda () (s-contains-p "{" (thing-at-point 'line t)))
+    :on-chars "{"
     :check-on-prev-line)
    (indention/make-rule
     :indent-func 'indention/decrement-indent-level
-    :predicate (lambda () (s-contains-p "}" (thing-at-point 'line t))))))
+    :on-chars "}")))
 
 
 
