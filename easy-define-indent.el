@@ -33,16 +33,16 @@
 
 
 (defconst indention/default-one-indent "    "
-  "Default indention when define for major mode.")
+    "Default indention when define for major mode.")
 
 
 (defvar indention/increment-indent-level-function nil
-  "This is function, which raise indent level of current line.
+    "This is function, which raise indent level of current line.
 Please, don't touch, this is change automatically.")
 
 
 (defvar indention/decrement-indent-level-function nil
-  "This is function, which deindent current line.
+    "This is function, which deindent current line.
 Please, don't touch, this is change automatically.")
 
 
@@ -277,6 +277,8 @@ non-nil value.  Possible `ARGS`:
 Before run `PREDICATE`, move to previous line.
 * :on-keywords <keywords>
 Call INDENT-FUNC When line has one of keywords.
+If keyword of keywords has space, then this keywords parsed as keyword 1 and
+keyword2 splitted (1+) spaces.
 * :on-chars <chars>
 Call INDENT-FUNC When line has one of chars."
     (let ((check-on-prev-line (plist-member args :check-on-prev-line))
@@ -300,11 +302,43 @@ Call INDENT-FUNC When line has one of chars."
 
 
 (defun indention/line-has-keywords-p (keywords)
-    "If S, has one of KEYWORDS, return t."
-    (->> (indention/current-line)
-         (s-split " ")
-         (-map 's-trim)
-         (-any (apply-partially '-contains-p keywords))))
+    "If S, has one of KEYWORDS, return t.
+If keyword of keywords has space, then this keywords parsed as keyword 1 and
+keyword2 splitted (1+) spaces."
+    (-any 'indention/line-has-this-keyword-p keywords))
+
+
+(defun indention/line-has-this-keyword-p (keyword)
+    "If current line has KEYWORD, then return t.
+If keyword has space(s), then this is parse as some words separated (1+)
+spaces."
+    (let ((keyword-regexp
+           (->> keyword
+                (s-split-words)
+                (indention/regexp-words-separated-spaces)
+                (indention/spaces-around-regexp))))
+        (message "%s" keyword-regexp)
+        (s-matches-p keyword-regexp
+                     (indention/current-line)))
+    )
+
+
+(defun indention/regexp-words-separated-spaces (words)
+    "Get regexp, which match all WORDS separated spaces."
+    (s-join " +" words)
+    )
+
+
+(defun indention/spaces-around-regexp (regexp)
+    "Add spaces around REGEXP."
+    (s-concat "^" regexp "$"
+              "\\|"
+              "^" regexp " "
+              "\\|"
+              " " regexp "$"
+              "\\|"
+              " " regexp " ")
+    )
 
 
 (defun indention/make-line-has-chars-p (chars)
@@ -317,7 +351,7 @@ Call INDENT-FUNC When line has one of chars."
 (defun indention/line-has-chars-p (chars)
     "If S, has one of CHARS, return t."
     (let ((line (indention/current-line)))
-        (--any (s-contains-p (char-to-string it) line)
+    (--any (s-contains-p (char-to-string it) line)
                (string-to-list chars))))
 
 
@@ -344,8 +378,8 @@ Return amount of moved lines."
 (defun indention/compose (&rest funs)
     "Return function composed of FUNS."
     (lexical-let ((lex-funs funs))
-        (lambda (&rest args)
-            (reduce 'funcall (butlast lex-funs)
+    (lambda (&rest args)
+    (reduce 'funcall (butlast lex-funs)
                     :from-end t
                     :initial-value (apply (car (last lex-funs)) args)))))
 
@@ -369,14 +403,14 @@ Before each indent of line call `EACH-LINE-BEFORE-INDENT-HOOK`, after
 (defun indention/rule-indent-current-line-p (rule)
     "Check this `RULE` must indent current line."
     (save-excursion
-        (funcall (-second-item rule)))
+    (funcall (-second-item rule)))
     )
 
 
 (defun indention/rule-call-indent-function (rule)
     "Call function for indent current line of `RULE`."
     (save-excursion
-        (beginning-of-line)
+    (beginning-of-line)
         (funcall (-first-item rule)))
     )
 
@@ -386,7 +420,7 @@ Before each indent of line call `EACH-LINE-BEFORE-INDENT-HOOK`, after
     (interactive)
     (indention/clear-indention)
     (save-excursion
-        (indention/to-backward-not-empty-line)
+    (indention/to-backward-not-empty-line)
         (indention/mark-indention)
         (copy-region-as-kill (region-beginning) (region-end)))
     (yank)
@@ -416,11 +450,12 @@ Before each indent of line call `EACH-LINE-BEFORE-INDENT-HOOK`, after
     (kill-region (region-beginning) (region-end))
     )
 
+
 (defun indention/if-empty-clear ()
     "If current line is empty, then clear line and navigate to next line."
     (interactive)
     (when (indention/empty-current-line-p)
-        (kill-region (point-at-bol) (point-at-eol))
+    (kill-region (point-at-bol) (point-at-eol))
         (forward-line))
     )
 
@@ -429,49 +464,49 @@ Before each indent of line call `EACH-LINE-BEFORE-INDENT-HOOK`, after
     "Mark as selected region indention of current line."
     (interactive)
     (let* ((point-at-next-line (save-excursion (if (eq (forward-line) 1)
-                                                   (end-of-line)
+    (end-of-line)
                                         ; When Still in current line ^
-                                                   (beginning-of-line)
+    (beginning-of-line)
                                         ; When In forward line ^
                                                    )
                                                (point)))
-           (point-at-not-space-char (save-excursion
-                                        (beginning-of-line)
+            (point-at-not-space-char (save-excursion
+    (beginning-of-line)
                                         (search-forward-regexp
                                          "[^ ]"
                                          point-at-next-line
                                          (1+ (point-at-bol)))
                                         (point))))
-        (goto-char (point-at-bol))
+    (goto-char (point-at-bol))
         (set-mark (point))
         (goto-char (1- point-at-not-space-char)))
     )
 
 
 (defmacro defun-in-namespace (namespace func-name
-                              arglist
-                              docstring
-                              &rest body)
+                             arglist
+                             docstring
+                             &rest body)
     "Define function in `NAMESPACE` with name `FUNC-NAME`.
 With respective `ARGLIST`, `DOCSTRING` and `BODY`."
     `(defun ,(from-namespace-for-symbols namespace func-name) ,arglist
-         ,docstring
+    ,docstring
          ,@body)
     )
 
 
 (defmacro defcustom-from-namespace (namespace
-                                    var-name
-                                    standard
-                                    docstring &rest args)
+                                   var-name
+                                   standard
+                                   docstring &rest args)
     "Define custom variable from `NAMESPACE`.
 `VAR-NAME` is name of variable.  `STANDARD` is default value of variable.
 `DOCSTRING` is documentation's string for variable.  `ARGS` is additional
 arguments for `defcustom`."
     `(defcustom ,(from-namespace-for-symbols namespace var-name)
-       ,standard
-       ,docstring
-       ,@args
+         ,standard
+         ,docstring
+         ,@args
        )
     )
 
