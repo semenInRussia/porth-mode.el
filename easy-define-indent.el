@@ -27,22 +27,25 @@
 (require 's)
 (require 'dash)
 
+(require 'indention-plist)
+
+
 (defgroup indention
     nil
     "Package for easy define indention functions and vars.")
 
 
 (defconst indention/default-one-indent "    "
-    "Default indention when define for major mode.")
+      "Default indention when define for major mode.")
 
 
 (defvar indention/increment-indent-level-function nil
-    "This is function, which raise indent level of current line.
+      "This is function, which raise indent level of current line.
 Please, don't touch, this is change automatically.")
 
 
 (defvar indention/decrement-indent-level-function nil
-    "This is function, which deindent current line.
+      "This is function, which deindent current line.
 Please, don't touch, this is change automatically.")
 
 
@@ -265,7 +268,7 @@ rules which you can create with `indention/make-rule`."
     )
 
 
-(cl-defun indention/make-rule (&rest args
+(cl-defun indention/make-rule (&optional &rest args
                                &key
                                  indent-func
                                  predicate
@@ -280,17 +283,29 @@ Call INDENT-FUNC When line has one of keywords.
 If keyword of keywords has space, then this keywords parsed as keyword 1 and
 keyword2 splitted (1+) spaces.
 * :on-chars <chars>
-Call INDENT-FUNC When line has one of chars."
-    (let ((check-on-prev-line (plist-member args :check-on-prev-line))
-          (keywords (plist-get args :on-keywords))
-          (chars (plist-get args :on-chars))
-          )
-        (when keywords
-            (setq predicate (indention/make-line-has-keywords-p keywords)))
-        (when chars
-            (setq predicate (indention/make-line-has-chars-p chars)))
+Call INDENT-FUNC When line has one of chars.
+* :add-indent
+INDENT-FUNC is just add `one-indent' to current line.
+* :deindent
+INDENT-FUNC is deindent current line"
+    (let ((keywords (ind-plist/get :on-keywords args))
+          (chars (ind-plist/get :on-chars args))
+          (add-indent (ind-plist/has :add-indent args))
+          (deindent (ind-plist/has :deindent args))
+          (check-on-prev-line (ind-plist/has :check-on-prev-line args)))
+        (cond
+          (keywords
+           (setq predicate (indention/make-line-has-keywords-p keywords)))
+          (chars
+           (setq predicate (indention/make-line-has-chars-p chars))
+           ))
+
         (when check-on-prev-line
             (setq predicate (indention/compose-with-prev-line predicate)))
+
+        (cond
+          (add-indent (setq indent-func 'indention/increment-indent-level))
+          (deindent (setq indent-func 'indention/decrement-indent-level)))
         (list indent-func predicate)))
 
 
@@ -470,7 +485,7 @@ Before each indent of line call `EACH-LINE-BEFORE-INDENT-HOOK`, after
                                         ; When In forward line ^
                                                    )
                                                (point)))
-            (point-at-not-space-char (save-excursion
+             (point-at-not-space-char (save-excursion
     (beginning-of-line)
                                         (search-forward-regexp
                                          "[^ ]"
@@ -504,9 +519,9 @@ With respective `ARGLIST`, `DOCSTRING` and `BODY`."
 `DOCSTRING` is documentation's string for variable.  `ARGS` is additional
 arguments for `defcustom`."
     `(defcustom ,(from-namespace-for-symbols namespace var-name)
-         ,standard
-         ,docstring
-         ,@args
+           ,standard
+           ,docstring
+           ,@args
        )
     )
 

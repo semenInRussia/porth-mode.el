@@ -1,15 +1,14 @@
+
 (indention/define-for-major-mode
   js js
-  :one-indent "  "
+  :one-indent "    "
   :rules
   (list
    (indention/make-rule
-    :indent-func 'indention/increment-indent-level
     :on-chars "{"
+    :add-indent
     :check-on-prev-line)
    (indention/make-rule
-    :indent-func 'indention/decrement-indent-level
-    :on-chars "}")))
-
-
+    :on-chars "}"
+    :deindent)))
 
