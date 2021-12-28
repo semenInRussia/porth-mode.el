@@ -1,4 +1,4 @@
-;;; indention-plist --- Operations on `plist`.
+;;; indention-plist --- Operations on `plist`. -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2021 Free Software Foundation, Inc.
 
@@ -47,4 +47,4 @@ N is index of element in LIST."
     )
 
 (provide 'indention-plist)
-;;; indention-plists.el ends here
+;;; indention-plist.el ends here
