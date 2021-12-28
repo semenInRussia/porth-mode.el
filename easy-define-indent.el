@@ -269,16 +269,16 @@ rules which you can create with `indention/make-rule`."
                  (when line-num (goto-line line-num))
                  (run-hooks ',before-indent-line-hook)
                  (funcall-from-namespace ,namespace
-                                         indent-line-without-run-cmd-hooks
-                                         line-num)
+                                         indent-line-without-run-cmd-hooks)
                  (run-hooks ',after-indent-line-hook)
                  )
 
              (defun-in-namespace
-                 ,namespace indent-line-without-run-cmd-hooks (line-num)
+                 ,namespace indent-line-without-run-cmd-hooks (&optional
+                                                               line-num)
                  "Indent line with `LINE-NUM`, but don't run command hooks."
                  (interactive (list (line-number-at-pos (point))))
-                 (goto-line line-num)
+                 (when line-num (goto-line line-num))
                  (indention/indent-line-with-sorted-rules
                   (eval (from-namespace ,namespace indention-rules))
                   :each-line-before-indent-hook ',before-each-line-hook
