@@ -1,4 +1,4 @@
-;;; easy-define-indent --- Mark create indent region function as easy task.-*- lexical-binding: t; -*-
+;;; easy-define-indent --- Mark create indent region function as easy task. -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2021 Free Software Foundation, Inc.
 
@@ -28,6 +28,7 @@
 (require 'dash)
 
 (require 'indention-plist)
+(require 'namespace)
 
 
 (defgroup indention
@@ -97,7 +98,16 @@ rules which you can create with `indention/make-rule`."
            (after-indent-some-lines-hook (from-namespace-for-symbols
                                            namespace
                                            'after-indent-some-lines-hook))
+           (after-each-line-indent-some-lines-hook
+            (from-namespace-for-symbols
+             namespace
+             'after-each-line-indent-some-lines-hook))
+           (before-each-line-indent-some-lines-hook
+            (from-namespace-for-symbols
+             namespace
+             'before-each-line-indent-some-lines-hook))
            )
+
         `(progn
              (defcustom-from-namespace ,namespace indention-rules
                  nil
@@ -146,6 +156,9 @@ rules which you can create with `indention/make-rule`."
                  :group ',major-mode
                  :type '(repeat function))
 
+             (add-hook ',after-run-indent-func-hook)
+
+
              (defcustom-from-namespace ,namespace after-indent-region-hook
                  nil
                  ,(s-lex-format
@@ -188,6 +201,24 @@ rules which you can create with `indention/make-rule`."
                  :group ',major-mode
                  :type '(repeat function))
 
+             (defcustom-from-namespace ,namespace
+                 before-each-line-indent-some-lines-hook
+                 nil
+                 ,(s-lex-format
+                   "This hook run before each indent line,
+ when indent some lines.")
+                 :group ',major-mode
+                 :type '(repeat function))
+
+             (defcustom-from-namespace ,namespace
+                 after-each-line-indent-some-lines-hook
+                 nil
+                 ,(s-lex-format
+                   "This hook run after each indent line,
+ when indent some lines.")
+                 :group ',major-mode
+                 :type '(repeat function))
+
              (dolist (hook '(,before-indent-lines-hook
                              ,before-indent-region-hook))
                  (add-hook hook
@@ -223,6 +254,46 @@ rules which you can create with `indention/make-rule`."
                                  (from-namespace ,namespace
                                                  decrement-indent-level))))
 
+             (defun-in-namespace
+                 ,namespace
+                 add-to-each-line-hook-when-indent-some-lines
+                 ()
+                 "Add funcs to `before-each-line-indent-hook', when indent 1+
+lines."
+                 (add-hook
+                  ',before-each-line-indent-hook
+                  (from-namespace
+                    ,namespace
+                    run-before-each-line-indent-some-lines-hooks)))
+
+             (defun-in-namespace
+                 ,namespace
+                 remove-from-each-line-hook-when-indent-some-lines
+                 ()
+                 "Remove funcs from `before-each-line-indent-hook', when indent
+1+ lines."
+                 (remove-hook
+                   ',before-each-line-indent-hook
+                   (from-namespace
+                    ,namespace
+                    run-before-each-line-indent-some-lines-hooks)))
+
+             (defun-in-namespace
+                 ,namespace run-before-each-line-indent-some-lines-hooks
+                 ()
+                 "Run `before-each-line-indent-some-lines-hook'."
+                 (run-hooks ',before-each-line-indent-some-lines-hook))
+
+             (add-hook ',after-indent-some-lines-hook
+                       (from-namespace
+                        ,namespace
+                        add-to-each-line-hook-when-indent-some-lines))
+
+             (add-hook ',after-indent-some-lines-hook
+                       (from-namespace
+                        ,namespace
+                        remove-from-each-line-hook-when-indent-some-lines))
+
              (add-hook ',after-run-indent-func-hook
                        'indention/to-defaults-change-indent-function)
 
@@ -231,8 +302,11 @@ rules which you can create with `indention/make-rule`."
                              'indention/duplicate-indention-of-prev-line))
 
              ,(if clear-old-indention
-                  `(add-hook ',before-each-line-hook
-                             'indention/clear-indention))
+                  `(add-hook ',before-indent-some-lines-hook
+                             (lambda ()
+                                 (add-hook ',before-each-line-hook
+                                           'indention/clear-indention)))
+                  )
 
              ,(if clear-empty-lines
                   `(add-hook ',before-each-line-hook 'indention/if-empty-clear))
@@ -268,7 +342,7 @@ rules which you can create with `indention/make-rule`."
                  (interactive)
                  (when line-num (goto-line line-num))
                  (run-hooks ',before-indent-line-hook)
-                 (funcall-from-namespace ,namespace
+                 (from-namespace-funcall ,namespace
                                          indent-line-without-run-cmd-hooks)
                  (run-hooks ',after-indent-line-hook)
                  )
@@ -294,7 +368,7 @@ rules which you can create with `indention/make-rule`."
                                (line-number-at-pos (region-beginning))
                                (line-number-at-pos (region-end))))
                  (run-hooks ',before-indent-lines-hook)
-                 (funcall-from-namespace ,namespace
+                 (from-namespace-funcall ,namespace
                                          indent-lines-without-run-cmd-hooks
                                          beg end)
                  (run-hooks ',after-indent-lines-hook))
@@ -307,10 +381,10 @@ rules which you can create with `indention/make-rule`."
                                (line-number-at-pos (region-beginning))
                                (line-number-at-pos (region-end))))
                  (unless (= (- end beg) 0)
-                     (funcall-from-namespace ,namespace
+                     (from-namespace-funcall ,namespace
                                              indent-line-without-run-cmd-hooks
                                              beg)
-                     (funcall-from-namespace ,namespace
+                     (from-namespace-funcall ,namespace
                                              indent-lines-without-run-cmd-hooks
                                              (1+ beg)
                                              end)
@@ -328,7 +402,7 @@ rules which you can create with `indention/make-rule`."
                                         (point))))
 
                  (run-hooks ',before-indent-region-hook)
-                 (funcall-from-namespace ,namespace
+                 (from-namespace-funcall ,namespace
                                          indent-region-without-run-cmd-hooks
                                          beg end)
                  (run-hooks ',after-indent-region-hook)
@@ -338,7 +412,7 @@ rules which you can create with `indention/make-rule`."
                  ,namespace indent-region-without-run-cmd-hooks (beg end)
                  "Indent region from `BEG` to `END` without run cmd hooks."
                  (interactive "r")
-                 (funcall-from-namespace ,namespace indent-lines
+                 (from-namespace-funcall ,namespace indent-lines
                                          (line-number-at-pos beg)
                                          (line-number-at-pos end))
                  )
@@ -597,62 +671,6 @@ Before each indent of line call `EACH-LINE-BEFORE-INDENT-HOOK`, after
         (goto-char (point-at-bol))
         (set-mark (point))
         (goto-char (1- point-at-not-space-char)))
-    )
-
-
-(defmacro defun-in-namespace (namespace func-name
-                              arglist
-                              docstring
-                              &rest body)
-    "Define function in `NAMESPACE` with name `FUNC-NAME`.
-With respective `ARGLIST`, `DOCSTRING` and `BODY`."
-    `(defun ,(from-namespace-for-symbols namespace func-name) ,arglist
-         ,docstring
-         ,@body)
-    )
-
-
-(defmacro defcustom-from-namespace (namespace
-                                    var-name
-                                    standard
-                                    docstring &rest args)
-    "Define custom variable from `NAMESPACE`.
-`VAR-NAME` is name of variable.  `STANDARD` is default value of variable.
-`DOCSTRING` is documentation's string for variable.  `ARGS` is additional
-arguments for `defcustom`."
-    `(defcustom ,(from-namespace-for-symbols namespace var-name)
-       ,standard
-       ,docstring
-       ,@args
-       )
-    )
-
-
-(defmacro funcall-from-namespace (namespace func-name &rest args)
-    "Call function with `FUNC-NAME` from `NAMESPACE` with `ARGS`."
-    `(,(from-namespace-for-symbols namespace func-name) ,@args)
-    )
-
-
-(defmacro var-from-namespace (namespace var-name)
-    "Get something symbol with `VAR-NAME` from `NAMESPACE`."
-    `(eval ,(from-namespace-for-symbols namespace var-name))
-    )
-
-
-(defmacro from-namespace (namespace something-name)
-    "Get something symbol with `SOMETHING-NAME` from `NAMESPACE`."
-    `(intern ,(s-concat (symbol-name namespace)
-                        "-"
-                        (symbol-name something-name)))
-    )
-
-
-(defun from-namespace-for-symbols (namespace-symb something-name-symb)
-    "Get something symbol with `SOMETHING-NAME` from `NAMESPACE`."
-    (intern (s-concat (symbol-name namespace-symb)
-                      "-"
-                      (symbol-name something-name-symb)))
     )
 
 
