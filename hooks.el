@@ -22,12 +22,16 @@
 ;;; Commentary:
 
 ;;; Code:
+
 (require 'dash)
+
+
 
 (defmacro hooks/union-to (destination-hook &rest hooks)
     "Add hook to run DESTINATION-HOOK to HOOKS."
-    `(--map (add-hook it (lambda () (run-hooks ,destination-hook)))
-            (list ,@hooks)))
+    `(--each (list ,@hooks)
+        (add-hook it (lambda () (run-hooks ,destination-hook))))
+    )
 
 
 (defmacro hooks/union-from-namespace-to (namespace
@@ -43,11 +47,32 @@ Example:
                         'calc-embeded-mode-hook
                         'calc-embedded-new-buffer-hook)"
     (setq dest-hook (from-namespace-for-symbols namespace dest-hook))
-    (setq hooks (->> hooks
-                     (--map (from-namespace-for-symbols namespace it))
-                     (-map (lambda (el) `(quote ,el)))))
+    (->> hooks
+         (--map (from-namespace-for-symbols namespace it))
+         (-map (lambda (el) `(quote ,el)))
+         (setq hooks))
     `(hooks/union-to ',dest-hook ,@hooks)
     )
+
+
+(defmacro hooks/add-to-hook-from-namespace (namespace hook function)
+    "Add to the value of HOOK from NAMESPACE the function FUNCTION.
+FUNCTION is not added if already present."
+    (setq hook (from-namespace-for-symbols namespace hook))
+    `(add-hook ',hook ,function)
+    )
+
+
+(defmacro hooks/run-from-namespace (namespace &rest hooks)
+    "Run all HOOKS from NAMESPACE."
+    (->> hooks
+         (--map (from-namespace-for-symbols namespace it))
+         (-map (lambda (el) `(quote ,el)))
+         (setq hooks))
+
+    `(run-hooks ,@hooks)
+    )
+
 
 
 ;;; hooks.el ends here

@@ -55,7 +55,7 @@ arguments for `defcustom`."
 
 
 (defmacro from-namespace-funcall (namespace func-name &rest args)
-    "Call function with `FUNC-NAME` from `NAMESPACE` with `ARGS`."
+    "Call function with FUNC-NAME from NAMESPACE with ARGS."
     `(,(from-namespace-for-symbols namespace func-name) ,@args)
     )
 
@@ -63,6 +63,12 @@ arguments for `defcustom`."
 (defmacro from-namespace-var (namespace var-name)
     "Get something symbol with `VAR-NAME` from `NAMESPACE`."
     `(eval ,(from-namespace-for-symbols namespace var-name))
+    )
+
+
+(defmacro from-namespace-setq (namespace var-name value)
+    "Setq var with VAR-NAME from NAMESPACE to VALUE."
+    `(set (from-namespace ,namespace ,var-name) ,value)
     )
 
 
