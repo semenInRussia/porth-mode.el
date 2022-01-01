@@ -5,7 +5,7 @@
 ;; Author: semenInRussia <hrams205@gmail.com>
 ;; Version: 0.0.1
 ;; Packages-Requires: ((dash "2.18.0")
-;;                     (s     "1.12.0"))
+;;                     (s    "1.12.0"))
 
 ;; This program is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -454,12 +454,17 @@ Call INDENT-FUNC When line has one of chars.
 * :add-indent
 INDENT-FUNC is just add `one-indent' to current line.
 * :deindent
-INDENT-FUNC is deindent current line"
+INDENT-FUNC is deindent current line
+* :if-true-check-next-rules
+If PREDICATE is true, then run INDENT-FUNC and run next indention rules"
     (let ((keywords (ind-plist/get :on-keywords args))
           (chars (ind-plist/get :on-chars args))
           (add-indent (ind-plist/has :add-indent args))
           (deindent (ind-plist/has :deindent args))
-          (check-on-prev-line (ind-plist/has :check-on-prev-line args)))
+          (check-on-prev-line (ind-plist/has :check-on-prev-line args))
+          (if-true-check-next-rules (ind-plist/has :if-true-check-next-rules
+                                                   args))
+          )
         (cond
           (keywords
            (setq predicate (indention/make-line-has-keywords-p keywords)))
@@ -473,7 +478,7 @@ INDENT-FUNC is deindent current line"
         (cond
           (add-indent (setq indent-func 'indention/increment-indent-level))
           (deindent (setq indent-func 'indention/decrement-indent-level)))
-        (list indent-func predicate)))
+        (list indent-func predicate if-true-check-next-rules)))
 
 
 (defun indention/make-line-has-keywords-p (keywords)
@@ -499,7 +504,6 @@ spaces."
                 (s-split-words)
                 (indention/regexp-words-separated-spaces)
                 (indention/spaces-around-regexp))))
-        (message "%s" keyword-regexp)
         (s-matches-p keyword-regexp
                      (indention/current-line)))
     )
@@ -567,12 +571,15 @@ Return amount of moved lines."
        (each-line-before-indent-hook nil)
        (each-line-after-indent-hook nil))
     "Indent or don't indent current line depending on `SORTED-RULES`.
-Before each indent of line call `EACH-LINE-BEFORE-INDENT-HOOK`, after
-`EACH-LINE-AFTER-INDENT-HOOK`"
-    (run-hooks each-line-before-indent-hook)
-    (cl-loop for rule in sorted-rules do
-         (when (indention/rule-indent-current-line-p rule)
-             (indention/rule-call-indent-function rule)))
+Before each indent of line call EACH-LINE-BEFORE-INDENT-HOOK, after
+EACH-LINE-AFTER-INDENT-HOOK"
+    (prog2
+        (run-hooks each-line-before-indent-hook)
+        (->> sorted-rules
+             (functools/take-including-while 'indention/rule-check-next-rules-p)
+             (-filter 'indention/rule-indent-current-line-p)
+             (-map 'indention/rule-call-indent-function))
+             )
     (run-hooks each-line-after-indent-hook)
     )
 
@@ -590,6 +597,18 @@ Before each indent of line call `EACH-LINE-BEFORE-INDENT-HOOK`, after
         (beginning-of-line)
         (funcall (-first-item rule)))
     )
+
+
+(defun indention/rule-if-true-check-next-rules-p (rule)
+    "Return t, if RULE need to check next rules, when RULE's predicate is t."
+    (-third-item rule)
+    )
+
+
+(defun indention/rule-check-next-rules-p (rule)
+    "Return t, if RULE need to check next indention rules."
+    (or (not (indention/rule-indent-current-line-p rule))
+        (indention/rule-if-true-check-next-rules-p rule)))
 
 
 (defun indention/duplicate-indention-of-prev-line ()
