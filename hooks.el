@@ -25,8 +25,6 @@
 
 (require 'dash)
 
-
-
 (defmacro hooks/union-to (destination-hook &rest hooks)
     "Add hook to run DESTINATION-HOOK to HOOKS."
     `(--each (list ,@hooks)
@@ -63,6 +61,40 @@ FUNCTION is not added if already present."
     )
 
 
+(defmacro hooks/add-to-hook-from-namespace (namespace hook function)
+    "Add to the value of HOOK from NAMESPACE the function FUNCTION.
+FUNCTION is not added if already present."
+    (setq hook (from-namespace-for-symbols namespace hook))
+    `(add-hook ',hook ,function)
+    )
+
+
+(defmacro hooks/from-namespace-add-hook (namespace hook function)
+    "Add to the value of HOOK from NAMESPACE the function FUNCTION.
+FUNCTION is not added if already present."
+    (setq hook (from-namespace-for-symbols namespace hook))
+    (setq function (from-namespace-for-symbols namespace function))
+    `(add-hook ',hook ',function)
+    )
+
+
+(defmacro hooks/from-namespace-remove-hook (namespace hook function)
+    "Remove to the value of HOOK from NAMESPACE the function FUNCTION.
+FUNCTION is not removed if already present."
+    (setq hook (from-namespace-for-symbols namespace hook))
+    (setq function (from-namespace-for-symbols namespace function))
+    `(remove-hook ',hook ',function)
+    )
+
+
+(defmacro hooks/remove-from-hook-from-namespace (namespace hook function)
+    "Add to the value of HOOK from NAMESPACE the function FUNCTION.
+FUNCTION is not added if already present."
+    (setq hook (from-namespace-for-symbols namespace hook))
+    `(remove-hook ',hook ,function)
+    )
+
+
 (defmacro hooks/run-from-namespace (namespace &rest hooks)
     "Run all HOOKS from NAMESPACE."
     (->> hooks
@@ -73,6 +105,14 @@ FUNCTION is not added if already present."
     `(run-hooks ,@hooks)
     )
 
+(defmacro hooks/from-namespace (namespace)
+    "Return hooks of NAMESPACE.
+For example:
+python => python-hook;
+clang => clang-hook;"
+    `(from-namespace ,namespace hook)
+    )
 
 
+(provide 'hooks)
 ;;; hooks.el ends here

@@ -27,18 +27,20 @@
 (require 'dash)
 (require 'functools)
 (require 's)
+(require 'hooks)
 
 (require 'indention-plist)
 (require 'namespace)
 
 
-(defgroup indention
-    nil
+(defgroup indention nil
     "Package for easy define indention functions and vars.")
 
 
-(defconst indention/default-one-indent "    "
-  "Default indention when define for major mode.")
+(defcustom indention/default-one-indent "    "
+  "Default indention when define for major mode."
+  :group 'indention
+  :type 'string)
 
 
 (defvar indention/increment-indent-level-function nil
@@ -51,6 +53,12 @@ Please, don't touch, this is change automatically.")
 Please, don't touch, this is change automatically.")
 
 
+(defcustom indention/text-symbol-regexp "[^\t \n]"
+  "Regexp for indicate text symbols."
+  :group 'indention
+  :type 'string)
+
+
 (cl-defmacro indention/define-for-major-mode
     (major-mode
      &optional namespace
@@ -60,32 +68,31 @@ Please, don't touch, this is change automatically.")
        (copy-indention-of-previous-line t)
        (clear-old-indention nil)
        (clear-empty-lines t)
-       (not-use-rules-for-first-line t)
        )
     "Create all variables and functions for indent code in `MAJOR-MODE`.
 All vars and functions will save in `NAMESPACE`.  `RULES` is list of
 rules which you can create with `indention/make-rule`."
-    (let* ((major-mode-name (symbol-name major-mode))
-           (one-indent-of-mode (from-namespace-for-symbols namespace
-                                                           'one-indent)))
+    (let ((major-mode-name (symbol-name major-mode))
+          (one-indent-of-mode `(eval (from-namespace ,namespace
+                                                     one-indent))))
         `(progn
              (defcustom-from-namespace ,namespace indention-rules
                  nil
-                 ,(s-concat "Rules of indention for " major-mode-name ".")
+                 ,(s-lex-format "Rules of indention for ${major-mode-name}.")
                  :group ',major-mode
                  :type '(repeat (list function function)))
 
              (from-namespace-setq ,namespace indention-rules ,rules)
 
-             (defcustom-from-namespace ,namespace each-line-after-indent-hook
-                 nil
-                 ,(s-lex-format "Hooks which run after each indent line.")
-                 :group ',major-mode
-                 :type '(repeat function))
-
              (defcustom-from-namespace ,namespace each-line-before-indent-hook
                  nil
                  "Hooks which run before each indent line."
+                 :group ',major-mode
+                 :type '(repeat function))
+
+             (defcustom-from-namespace ,namespace each-line-after-indent-hook
+                 nil
+                 "Hooks which run after each indent line."
                  :group ',major-mode
                  :type '(repeat function))
 
@@ -97,7 +104,7 @@ rules which you can create with `indention/make-rule`."
 
              (defcustom-from-namespace ,namespace after-run-indent-func-hook
                  nil
-                 ,(s-lex-format "Hooks which run after runing indent func.")
+                 "Hooks which run after runing indent function."
                  :group ',major-mode
                  :type '(repeat function))
 
@@ -146,26 +153,29 @@ rules which you can create with `indention/make-rule`."
              (defcustom-from-namespace ,namespace before-indent-some-lines-hook
                  nil
                  ,(s-lex-format
-                   "This hooks run before `indent-some-lines`.")
+                   "This hooks run before
+`${major-mode-name}-indent-some-lines'.")
                  :group ',major-mode
                  :type '(repeat function))
 
              (defcustom-from-namespace ,namespace after-indent-some-lines-hook
                  nil
-                 "This hooks run after `indent-some-lines`."
+                 ,(s-lex-format
+                   "This hooks run after
+`${major-mode-name}-indent-some-lines`.")
                  :group ',major-mode
                  :type '(repeat function))
 
-             (defcustom-from-namespace ,namespace
-                 before-each-line-indent-some-lines-hook
+             (defcustom-from-namespace
+                 ,namespace indent-some-lines-before-each-line-hook
                  nil
                  "This hook run before each indent line,
 when indent some lines."
                  :group ',major-mode
                  :type '(repeat function))
 
-             (defcustom-from-namespace ,namespace
-                 after-each-line-indent-some-lines-hook
+             (defcustom-from-namespace
+                 ,namespace indent-some-lines-after-each-line-hook
                  nil
                  "This hook run after each indent line, when indent some lines."
                  :group ',major-mode
@@ -202,16 +212,71 @@ when indent some lines."
               before-run-indent-func-hook
               (lambda ()
                   (setq indention/increment-indent-level-function
-                        (from-namespace ,namespace
-                                        increment-indent-level))
+                        (from-namespace ,namespace increment-indent-level))
                   (setq indention/decrement-indent-level-function
-                        (from-namespace ,namespace
-                                        decrement-indent-level))))
+                        (from-namespace ,namespace decrement-indent-level))))
 
              (hooks/add-to-hook-from-namespace
               ,namespace
               after-run-indent-func-hook
               'indention/to-defaults-change-indent-function)
+
+             (defun-in-namespace
+                 ,namespace add-indent-some-lines-before-each-line-hook ()
+                 ,(s-lex-format
+                   "Add to `${major-mode-name}-before-each-line-indent-hook'
+`${major-mode-name}-indent-some-lines-before-each-line-hook'.")
+                 (hooks/from-namespace-add-hook
+                  ,namespace
+                  before-each-line-indent-hook
+                  run-indent-some-lines-before-each-line-hook)
+
+                 (hooks/from-namespace-add-hook
+                  ,namespace
+                  after-each-line-indent-hook
+                  run-indent-some-lines-after-each-line-hook)
+                 )
+
+             (defun-in-namespace
+                 ,namespace
+                 remove-indent-some-lines-before-each-line-hook ()
+                 ,(s-lex-format
+                   "Remove from
+ `${major-mode-name}-before-each-line-indent-hook'
+`${major-mode-name}-indent-some-lines-before-each-line-hook'.")
+                 (hooks/from-namespace-remove-hook
+                  ,namespace
+                  before-each-line-indent-hook
+                  run-indent-some-lines-before-each-line-hook)
+
+                 (hooks/from-namespace-remove-hook
+                  ,namespace
+                  after-each-line-indent-hook
+                  run-indent-some-lines-after-each-line-hook))
+
+             (defun-in-namespace
+                 ,namespace run-indent-some-lines-before-each-line-hook ()
+                 "Run `indent-some-lines-before-each-line-hook'."
+                 (hooks/run-from-namespace
+                  ,namespace indent-some-lines-after-each-line-hook)
+                 )
+
+             (defun-in-namespace
+                 ,namespace run-indent-some-lines-after-each-line-hook ()
+                 "Run `indent-some-lines-before-each-line-hook'."
+                 (hooks/run-from-namespace
+                  ,namespace indent-some-lines-before-each-line-hook)
+                 )
+
+             (hooks/from-namespace-add-hook
+              ,namespace
+              before-indent-some-lines-hook
+              add-indent-some-lines-before-each-line-hook)
+
+             (hooks/from-namespace-add-hook
+              ,namespace
+              before-indent-some-lines-hook
+              remove-indent-some-lines-before-each-line-hook)
 
              ,(if copy-indention-of-previous-line
                   `(hooks/add-to-hook-from-namespace
@@ -220,15 +285,16 @@ when indent some lines."
                     'indention/duplicate-indention-of-prev-line))
 
              ,(if clear-old-indention
-                  `(hooks/add-to-hook-from-namespace ,namespace
-                                                     before-each-line-hook
-                                                     'indention/clear-indention)
-                  )
+                  `(hooks/add-to-hook-from-namespace
+                    ,namespace
+                    before-each-line-hook
+                    'indention/clear-indention))
 
              ,(if clear-empty-lines
-                  `(hooks/add-to-hook-from-namespace ,namespace
-                                                     before-each-line-hook
-                                                     'indention/if-empty-clear))
+                  `(hooks/add-to-hook-from-namespace
+                    ,namespace
+                    before-each-line-hook
+                    'indention/if-empty-clear))
 
              (defcustom-from-namespace ,namespace one-indent
                  ,one-indent
@@ -249,7 +315,7 @@ when indent some lines."
                  "Deindent current line."
                  (interactive)
                  (when (s-prefix-p ,one-indent-of-mode
-                                   (thing-at-point 'line t))
+                                   (indention/current-line))
                      (beginning-of-line)
                      (delete-forward-char (length ,one-indent-of-mode)))
                  )
@@ -259,7 +325,8 @@ when indent some lines."
                  ,(s-lex-format
                    "Indent line with LINE-NUM, for `${major-mode-name}`.")
                  (interactive)
-                 (when line-num (goto-line line-num))
+                 (when line-num
+                     (goto-line line-num))
                  (hooks/run-from-namespace ,namespace before-indent-line-hook)
                  (from-namespace-funcall ,namespace
                                          indent-line-without-run-cmd-hooks)
@@ -270,7 +337,7 @@ when indent some lines."
                  ,namespace indent-line-without-run-cmd-hooks (&optional
                                                                line-num)
                  "Indent line with `LINE-NUM`, but don't run command hooks."
-                 (interactive (list (line-number-at-pos (point))))
+                 (interactive)
                  (when line-num (goto-line line-num))
                  (indention/indent-line-with-sorted-rules
                   (eval (from-namespace ,namespace indention-rules))
@@ -291,7 +358,8 @@ when indent some lines."
                  (hooks/run-from-namespace ,namespace before-indent-lines-hook)
                  (from-namespace-funcall ,namespace
                                          indent-lines-without-run-cmd-hooks
-                                         beg end)
+                                         beg
+                                         end)
                  (hooks/run-from-namespace ,namespace after-indent-lines-hook)
                  )
 
@@ -309,24 +377,22 @@ when indent some lines."
                      (from-namespace-funcall ,namespace
                                              indent-lines-without-run-cmd-hooks
                                              (1+ beg)
-                                             end)
-                     )
+                                             end))
                  )
 
              (defun-in-namespace
                  ,namespace indent-region (beg end)
                  ,(s-lex-format
-                   "Indent region from `BEG` to `END` for ${major-mode-name}")
+                   "Indent region from `BEG` to `END` for
+${major-mode-name}")
                  (interactive "r")
-                 (hooks/run-from-namespace ,namespace before-indent-region-hook)
-                 ,(if not-use-rules-for-first-line
-                      `(setq beg (progn (goto-char beg)
-                                        (forward-line)
-                                        (point))))
+                 (hooks/run-from-namespace ,namespace
+                                           before-indent-region-hook)
                  (from-namespace-funcall ,namespace
                                          indent-region-without-run-cmd-hooks
                                          beg end)
-                 (hooks/run-from-namespace ,namespace after-indent-region-hook)
+                 (hooks/run-from-namespace ,namespace
+                                           after-indent-region-hook)
                  )
 
              (defun-in-namespace
@@ -472,10 +538,14 @@ spaces."
     (thing-at-point 'line t))
 
 
-(defun indention/compose-with-prev-line (fun)
-    "Return func, which run `indention/previous-line' and FUN."
-    (->> (-juxt 'indention/previous-line fun)
-         (functools/compose '-last-item)))
+(defun indention/compose-with-prev-line (f)
+    "Return func, which run `indention/previous-line' and function F.
+If impossible go to previous line, then return nil."
+    (lambda ()
+        (when (eq 0 (indention/previous-line))
+                                        ; when successively go to previous line
+            (funcall f)))
+    )
 
 
 (defun indention/previous-line (&optional n)
@@ -531,12 +601,14 @@ Before each indent of line call `EACH-LINE-BEFORE-INDENT-HOOK`, after
 
 
 (defun indention/to-backward-not-empty-line ()
-    "Navigate to backward line not empty (has 1+ not whitespace symbol)."
+    "Navigate to end of backward line not empty (has 1+ not whitespace symbol).
+If empty line not found, then return nil, if ok, then return t."
     (interactive)
     (forward-line -1)
     (end-of-line)
-    (search-backward-regexp "[^ \n\t]" nil nil)
-    (end-of-line)
+    (prog1
+        (search-backward-regexp "[^ \n\t]" nil t)
+        (end-of-line))
     )
 
 
@@ -554,35 +626,47 @@ Before each indent of line call `EACH-LINE-BEFORE-INDENT-HOOK`, after
     )
 
 
+(defun indention/mark-indention ()
+    "Mark as selected region indention of current line."
+    (interactive)
+    (if (indention/empty-current-line-p)
+                                        ; Then...
+        (indention/mark-line)
+                                        ; Else...
+        (beginning-of-line)
+        (let ((indent-end (1- (indention/point-at-forward-regexp
+                               indention/text-symbol-regexp))))
+            (indention/mark-region (point) indent-end)))
+    )
+
+
+(defun indention/point-at-forward-regexp (regexp &optional bound)
+    "Return `point' at forward REGEXP in buffer.
+If regexp not found, then get nil, otherwise get `point'.  Max `point' is
+BOUND."
+    (save-excursion (search-forward-regexp regexp bound t))
+    )
+
+(defun indention/mark-line ()
+    "Mark whole current line, push position before run function."
+    (indention/mark-region (point-at-bol) (point-at-eol))
+    )
+
+
+(defun indention/mark-region (beg end)
+    "Mark region from BEG to END, push position before run function."
+    (push-mark)
+    (push-mark beg nil t)
+    (goto-char end)
+    )
+
+
 (defun indention/if-empty-clear ()
     "If current line is empty, then clear line and navigate to next line."
     (interactive)
     (when (indention/empty-current-line-p)
         (kill-region (point-at-bol) (point-at-eol))
         (forward-line))
-    )
-
-
-(defun indention/mark-indention ()
-    "Mark as selected region indention of current line."
-    (interactive)
-    (let* ((point-at-next-line (save-excursion (if (eq (forward-line) 1)
-                                                   (end-of-line)
-                                        ; When Still in current line ^
-                                                   (beginning-of-line)
-                                        ; When In forward line ^
-                                                   )
-                                               (point)))
-           (point-at-not-space-char (save-excursion
-                                        (beginning-of-line)
-                                        (search-forward-regexp
-                                         "[^ ]"
-                                         point-at-next-line
-                                         (1+ (point-at-bol)))
-                                        (point))))
-        (goto-char (point-at-bol))
-        (set-mark (point))
-        (goto-char (1- point-at-not-space-char)))
     )
 
 

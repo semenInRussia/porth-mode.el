@@ -74,6 +74,7 @@ arguments for `defcustom`."
 
 (defmacro from-namespace (namespace something-name)
     "Get something symbol with `SOMETHING-NAME` from `NAMESPACE`."
+    (message "nams is %s" (symbol-name namespace))
     `(intern ,(s-concat (symbol-name namespace)
                         "-"
                         (symbol-name something-name)))
