@@ -291,13 +291,13 @@ when indent some lines."
              ,(if clear-old-indention
                   `(hooks/add-to-hook-from-namespace
                     ,namespace
-                    before-each-line-indent-hook
+                    indent-some-lines-before-each-line-indent-hook
                     'indention/clear-indention))
 
              ,(if clear-empty-lines
                   `(hooks/add-to-hook-from-namespace
                     ,namespace
-                    before-each-line-indent-hook
+                    indent-some-lines-before-each-line-indent-hook
                     'indention/if-empty-clear))
 
              (defcustom-from-namespace ,namespace one-indent
@@ -318,8 +318,7 @@ when indent some lines."
                  ,namespace decrement-indent-level ()
                  "Deindent current line."
                  (interactive)
-                 (when (s-prefix-p ,one-indent-of-mode
-                                   (indention/current-line))
+                 (when (s-prefix-p ,one-indent-of-mode (indention/current-line))
                      (beginning-of-line)
                      (delete-forward-char (length ,one-indent-of-mode)))
                  )
@@ -327,7 +326,7 @@ when indent some lines."
              (defun-in-namespace
                  ,namespace indent-line (&optional line-num)
                  ,(s-lex-format
-                   "Indent line with LINE-NUM, for `${major-mode-name}`.")
+                   "Indent line with LINE-NUM, for `${major-mode-name}'.")
                  (interactive)
                  (when line-num
                      (goto-line line-num))
@@ -335,6 +334,7 @@ when indent some lines."
                  (from-namespace-funcall ,namespace
                                          indent-line-without-run-cmd-hooks)
                  (hooks/run-from-namespace ,namespace after-indent-line-hook)
+                 (end-of-line)
                  )
 
              (defun-in-namespace
