@@ -167,7 +167,7 @@ rules which you can create with `indention/make-rule`."
                  :type '(repeat function))
 
              (defcustom-from-namespace
-                 ,namespace indent-some-lines-before-each-line-hook
+                 ,namespace indent-some-lines-before-each-line-indent-hook
                  nil
                  "This hook run before each indent line,
 when indent some lines."
@@ -175,7 +175,7 @@ when indent some lines."
                  :type '(repeat function))
 
              (defcustom-from-namespace
-                 ,namespace indent-some-lines-after-each-line-hook
+                 ,namespace indent-some-lines-after-each-line-indent-hook
                  nil
                  "This hook run after each indent line, when indent some lines."
                  :group ',major-mode
@@ -222,78 +222,82 @@ when indent some lines."
               'indention/to-defaults-change-indent-function)
 
              (defun-in-namespace
-                 ,namespace add-indent-some-lines-before-each-line-hook ()
+                 ,namespace
+                 add-indent-some-lines-before-each-line-indent-hook ()
                  ,(s-lex-format
                    "Add to `${major-mode-name}-before-each-line-indent-hook'
-`${major-mode-name}-indent-some-lines-before-each-line-hook'.")
+`${major-mode-name}-indent-some-lines-before-each-line-indent-hook'.")
                  (hooks/from-namespace-add-hook
                   ,namespace
                   before-each-line-indent-hook
-                  run-indent-some-lines-before-each-line-hook)
+                  run-indent-some-lines-before-each-line-indent-hook)
 
                  (hooks/from-namespace-add-hook
                   ,namespace
                   after-each-line-indent-hook
-                  run-indent-some-lines-after-each-line-hook)
+                  run-indent-some-lines-after-each-line-indent-hook)
                  )
 
              (defun-in-namespace
                  ,namespace
-                 remove-indent-some-lines-before-each-line-hook ()
+                 remove-indent-some-lines-before-each-line-indent-hook ()
                  ,(s-lex-format
                    "Remove from
  `${major-mode-name}-before-each-line-indent-hook'
-`${major-mode-name}-indent-some-lines-before-each-line-hook'.")
+`${major-mode-name}-indent-some-lines-before-each-line-indent-hook'.")
                  (hooks/from-namespace-remove-hook
                   ,namespace
                   before-each-line-indent-hook
-                  run-indent-some-lines-before-each-line-hook)
+                  run-indent-some-lines-before-each-line-indent-hook)
 
                  (hooks/from-namespace-remove-hook
                   ,namespace
                   after-each-line-indent-hook
-                  run-indent-some-lines-after-each-line-hook))
-
-             (defun-in-namespace
-                 ,namespace run-indent-some-lines-before-each-line-hook ()
-                 "Run `indent-some-lines-before-each-line-hook'."
-                 (hooks/run-from-namespace
-                  ,namespace indent-some-lines-after-each-line-hook)
+                  run-indent-some-lines-after-each-line-indent-hook)
                  )
 
              (defun-in-namespace
-                 ,namespace run-indent-some-lines-after-each-line-hook ()
-                 "Run `indent-some-lines-before-each-line-hook'."
+                 ,namespace
+                 run-indent-some-lines-before-each-line-indent-hook ()
+                 "Run `indent-some-lines-before-each-line-indent-hook'."
                  (hooks/run-from-namespace
-                  ,namespace indent-some-lines-before-each-line-hook)
+                  ,namespace indent-some-lines-before-each-line-indent-hook)
+                 )
+
+             (defun-in-namespace
+                 ,namespace run-indent-some-lines-after-each-line-indent-hook ()
+                 "Run `indent-some-lines-before-each-line-indent-hook'."
+                 (hooks/run-from-namespace
+                  ,namespace
+                  indent-some-lines-after-each-line-indent-hook)
                  )
 
              (hooks/from-namespace-add-hook
               ,namespace
               before-indent-some-lines-hook
-              add-indent-some-lines-before-each-line-hook)
+              add-indent-some-lines-before-each-line-indent-hook)
 
              (hooks/from-namespace-add-hook
               ,namespace
-              before-indent-some-lines-hook
-              remove-indent-some-lines-before-each-line-hook)
+              after-indent-some-lines-hook
+              remove-indent-some-lines-before-each-line-indent-hook)
 
              ,(if copy-indention-of-previous-line
                   `(hooks/add-to-hook-from-namespace
                     ,namespace
-                    before-each-line-hook
+                    before-each-line-indent-hook
                     'indention/duplicate-indention-of-prev-line))
 
              ,(if clear-old-indention
                   `(hooks/add-to-hook-from-namespace
                     ,namespace
-                    before-each-line-hook
+                    before-each-line-indent-hook
                     'indention/clear-indention))
 
              ,(if clear-empty-lines
                   `(hooks/add-to-hook-from-namespace
                     ,namespace
-                    before-each-line-hook
+                    before-each-line-indent-hook
                     'indention/if-empty-clear))
 
              (defcustom-from-namespace ,namespace one-indent
@@ -342,7 +346,7 @@ when indent some lines."
                  (indention/indent-line-with-sorted-rules
                   (eval (from-namespace ,namespace indention-rules))
                   :each-line-before-indent-hook
-                  (from-namespace ,namespace before-each-line-hook)
+                  (from-namespace ,namespace before-each-line-indent-hook)
                   :each-line-after-indent-hook
                   (from-namespace ,namespace after-each-line-hook))
                  )
